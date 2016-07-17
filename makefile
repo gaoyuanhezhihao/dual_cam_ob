@@ -1,4 +1,4 @@
-CC :=g++
+CC :=g++ -g
 SRCDIR := src
 BUILDDIR := build
 TARGET :=bin/runner

@@ -1,4 +1,7 @@
 #include "feature.hpp"
+#define POS_MATCH_DIST_THRES 200		
+#define NEG_MATCH_DIST_THRES 200		
+#define DETA_X_THRES 50
 /*sift_match: match two images using sift feature.
  * @img_1: first image.
  * @img_2: second_image.
@@ -19,6 +22,8 @@ int sift_match(cv::Mat &img1, cv::Mat & img_2, int pos_match_num,
 {
 		if( !img1.data || !img_2.data )
 		{ return -1; }
+		static int im_id = 0;
+		++im_id;
 		cv::Mat img1_copy;
 		cv::Mat img2_copy;
 		cv::cvtColor(img1, img1_copy, cv::COLOR_BGR2GRAY);
@@ -40,6 +45,11 @@ int sift_match(cv::Mat &img1, cv::Mat & img_2, int pos_match_num,
 		detector->detect(img_1_up_half, keypoints_1_up);
 		detector->detect(img_1_down_half, keypoints_1_down);
 		detector->detect( img_2, keypoints_2);
+		if(keypoints_1_up.size() == 0 || keypoints_1_down.size() == 0 || keypoints_2.size() == 0) {
+				return -2;
+		}
+		pos_match_num = pos_match_num > keypoints_1_up.size()? keypoints_1_up.size(): pos_match_num;
+		neg_match_num = neg_match_num > keypoints_1_down.size() ?keypoints_1_down.size() : neg_match_num;
 
 		detector->compute(img_1_up_half, keypoints_1_up, descriptors_1_up);
 		detector->compute(img_1_down_half, keypoints_1_down, descriptors_1_down);
@@ -68,6 +78,7 @@ int sift_match(cv::Mat &img1, cv::Mat & img_2, int pos_match_num,
 		int t_id = -1;
 		array<Point2f, 2> tmp_match_pair;
 		Point2f tmp_pt;
+		cout << "positive matches' dist" << endl;
 		for(i=0;i<pos_match_num;++i) {
 				q_id = matches_up[i].queryIdx;
 				t_id = matches_up[i].trainIdx;
@@ -75,9 +86,18 @@ int sift_match(cv::Mat &img1, cv::Mat & img_2, int pos_match_num,
 				tmp_match_pair[1] = keypoints_2[t_id].pt;
 				pos_matches.push_back(tmp_match_pair);
 				pos_match_dist.push_back(matches_up[i].distance);
-				cv::circle(img1_copy, tmp_match_pair[0], 3, Scalar(0,0,255), -1);
-				cv::circle(img2_copy, tmp_match_pair[1], 3, Scalar(0, 0, 255), -1);
+				cout << matches_up[i].distance<< endl;
+				if(matches_up[i].distance < POS_MATCH_DIST_THRES && 
+							cv::abs(tmp_match_pair[0].x - tmp_match_pair[1].x) < DETA_X_THRES) {
+						cv::circle(img1_copy, tmp_match_pair[0], 3, Scalar(0,0,255), -1);
+						cv::circle(img2_copy, tmp_match_pair[1], 3, Scalar(0, 0, 255), -1);
+				}else {
+						cv::circle(img1_copy, tmp_match_pair[0], 3, Scalar(0,0,100), -1);
+						cv::circle(img2_copy, tmp_match_pair[1], 3, Scalar(0, 0, 100), -1);
+
+				}
 		}
+		cout << "negtive matches' dist "<<endl;
 		for(i = 0;i< neg_match_num;++i) {
 			q_id = matches_down[i].queryIdx;
 			t_id = matches_down[i].trainIdx;
@@ -85,9 +105,16 @@ int sift_match(cv::Mat &img1, cv::Mat & img_2, int pos_match_num,
 			tmp_match_pair[1] = keypoints_2[t_id].pt;
 			neg_matches.push_back(tmp_match_pair);
 			neg_match_dist.push_back(matches_down[i].distance);
+			cout << matches_down[i].distance << endl;
 			tmp_pt.y += img1_copy.rows/2;	
-			cv::circle(img1_copy, tmp_pt, 3, Scalar(0,255,0), -1);
-			cv::circle(img2_copy, tmp_match_pair[1], 3, Scalar(0, 255, 0), -1);
+			if(matches_down[i].distance < NEG_MATCH_DIST_THRES ) {
+					cv::circle(img1_copy, tmp_pt, 3, Scalar(0,255,0), -1);
+					cv::circle(img2_copy, tmp_match_pair[1], 3, Scalar(0, 255, 0), -1);
+			}else {
+					cv::circle(img1_copy, tmp_pt, 3, Scalar(0,100,0), -1);
+					cv::circle(img2_copy, tmp_match_pair[1], 3, Scalar(0, 100, 0), -1);
+
+			}
 		}
 		
 		//-- Draw matches
@@ -99,6 +126,10 @@ int sift_match(cv::Mat &img1, cv::Mat & img_2, int pos_match_num,
 		imshow("Down Matches", img_matches_down);
 		imshow("img1_copy", img1_copy);
 		imshow("img2_copy", img2_copy);
+		imwrite(string("Up Matches") + to_string(im_id) + string(".jpg"), img_matches_up);
+		imwrite(string("Down Matches") + to_string(im_id) + string(".jpg"), img_matches_down);
+		imwrite(string("img1_copy") + to_string(im_id) + string(".jpg"),  img1_copy);
+		imwrite(string("img2_copy") + to_string(im_id) + string(".jpg"), img2_copy);
 		waitKey(0);
 		return 0;
 }
